@@ -80,10 +80,6 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
 }
 
 func main(){
-    p1 := Page{Title: "mango", Body: []byte("ripe mango is yellow.")}
-    p1.save()
-    content, _ := load("mango")
-    fmt.Println(string(content.Body))
     http.HandleFunc("/view/", viewHandler)
     http.HandleFunc("/save/", saveHandler)
     http.HandleFunc("/edit/", editHandler)
