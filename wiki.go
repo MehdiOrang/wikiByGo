@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "regexp"
     "html/template"
     "net/http"
     "os"
@@ -13,6 +14,8 @@ type Page struct{
     Body  []byte
 }
 var templates = template.Must(template.ParseFiles("view.html"))
+var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+
 func (p *Page) save() error{
     source := p.Title
     return os.WriteFile(source, p.Body, 0600)
@@ -30,8 +33,7 @@ func load(name string) (*Page, error) {
 }
 
 
-func viewHandler(w http.ResponseWriter, r *http.Request){
-	title := r.URL.Path[len("/view/"):]
+func viewHandler(w http.ResponseWriter, r *http.Request, title string){
 	page, err  := load(title)
 	if err != nil{
 	    http.Redirect(w, r, "/edit/"+title, http.StatusFound)
@@ -56,8 +58,7 @@ func editHandler(w http.ResponseWriter, r * http.Request){
 
 }
 
-func saveHandler(w http.ResponseWriter, r *http.Request){
-    title := r.URL.Path[len("/save/"):]
+func saveHandler(w http.ResponseWriter, r *http.Request,title string){
     body := r.FormValue("body")
     p := &Page{Title: title, Body: []byte(body)}
     err := p.save()
@@ -65,6 +66,15 @@ func saveHandler(w http.ResponseWriter, r *http.Request){
 	http.Error(w, err.Error(), http.StatusInternalServerError)
     }
     http.Redirect(w, r, "/view/"+title, http.StatusFound)
+}
+func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc{
+   return func(w http.ResponseWriter, r *http.Request){
+	m := validPath.FindStringSubmatch(r.URL.Path)
+	if m == nil {
+	    http.NotFound(w, r)
+	}
+	fn(w, r, m[2])
+   }
 }
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
@@ -74,9 +84,10 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page){
     }
 }
 
+
 func main(){
-    http.HandleFunc("/view/", viewHandler)
-    http.HandleFunc("/save/", saveHandler)
+    http.HandleFunc("/view/", makeHandler(viewHandler))
+    http.HandleFunc("/save/", makeHandler(saveHandler))
     http.HandleFunc("/edit/", editHandler)
     log.Fatal(http.ListenAndServe(":8080",nil))
 }
